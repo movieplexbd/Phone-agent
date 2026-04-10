@@ -36,62 +36,40 @@ async function safeRequest(url, retries = 3) {
   }
 }
 
-async function scrapePhones() {
+async function scrapeMobileDokan() {
   try {
-    const url = "https://www.gsmarena.com/";
+    const url = "https://www.mobiledokan.com/mobile/";
     const res = await safeRequest(url);
     const $ = cheerio.load(res.data);
 
-    let phoneData = [];
-    $(".brandmenu-v2 li a").each((i, el) => {
-      const brandName = $(el).text();
-      const brandLink = "https://www.gsmarena.com/" + $(el).attr("href");
-      phoneData.push({ brand: brandName, link: brandLink });
+    let allPhones = [];
+
+    // ✅ প্রতিটি ফোনের ব্লক scrape করো
+    $(".phone").each((i, el) => {
+      const modelName = $(el).find(".phone-title a").text().trim();
+      const modelLink = $(el).find(".phone-title a").attr("href");
+      const img = $(el).find("img").attr("src");
+      const price = $(el).find(".phone-price").text().trim();
+
+      // Specs block
+      let specs = {};
+      $(el).find(".phone-specs li").each((j, specEl) => {
+        const specText = $(specEl).text().trim();
+        specs[`spec_${j}`] = specText;
+      });
+
+      allPhones.push({
+        model: modelName,
+        link: modelLink,
+        image: img,
+        price: price,
+        specs: specs
+      });
     });
 
-    let allPhones = [];
-    for (let brand of phoneData) {
-      try {
-        const brandRes = await safeRequest(brand.link);
-        const $$ = cheerio.load(brandRes.data);
-
-        $$(".makers li a").each(async (i, el) => {
-          const modelName = $$(el).find("strong span").text();
-          const modelLink = "https://www.gsmarena.com/" + $$(el).attr("href");
-          const img = $$(el).find("img").attr("src");
-
-          // ✅ Model details
-          let specs = {};
-          try {
-            const modelRes = await safeRequest(modelLink);
-            const $$$ = cheerio.load(modelRes.data);
-
-            $$$(".specs-brief span").each((j, specEl) => {
-              specs[`spec_${j}`] = $$$(specEl).text();
-            });
-          } catch (err) {
-            console.error(`❌ Error scraping model ${modelName}:`, err.message);
-          }
-
-          allPhones.push({
-            brand: brand.brand,
-            model: modelName,
-            link: modelLink,
-            image: img,
-            specs: specs
-          });
-        });
-
-        console.log(`✅ Scraped ${brand.brand}, total phones: ${allPhones.length}`);
-        await sleep(3000); // delay between brands
-
-      } catch (err) {
-        console.error(`❌ Error scraping brand ${brand.brand}:`, err.message);
-      }
-    }
-
+    // ✅ Firebase এ সেভ করো
     await set(ref(db, "phones/latest"), allPhones);
-    console.log("✅ All phone data saved to Firebase. Total:", allPhones.length);
+    console.log("✅ All MobileDokan phone data saved. Total:", allPhones.length);
 
     process.exit(0);
 
@@ -101,4 +79,4 @@ async function scrapePhones() {
   }
 }
 
-scrapePhones();
+scrapeMobileDokan();
