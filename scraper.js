@@ -15,50 +15,84 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// Helper: delay function
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper: safe request with retry
+async function safeRequest(url, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await axios.get(url);
+    } catch (err) {
+      if (err.response && err.response.status === 429) {
+        console.warn("⚠️ Rate limited, waiting...");
+        await sleep(5000);
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 async function scrapePhones() {
   try {
     const url = "https://www.gsmarena.com/";
-    const res = await axios.get(url);
+    const res = await safeRequest(url);
     const $ = cheerio.load(res.data);
 
     let phoneData = [];
-
-    // ✅ প্রতিটি ব্র্যান্ডের লিঙ্ক বের করো
     $(".brandmenu-v2 li a").each((i, el) => {
       const brandName = $(el).text();
       const brandLink = "https://www.gsmarena.com/" + $(el).attr("href");
       phoneData.push({ brand: brandName, link: brandLink });
     });
 
-    // ✅ প্রতিটি ব্র্যান্ডের পেজ থেকে লেটেস্ট ফোন মডেল scrape করো
     let allPhones = [];
     for (let brand of phoneData) {
       try {
-        const brandRes = await axios.get(brand.link);
+        const brandRes = await safeRequest(brand.link);
         const $$ = cheerio.load(brandRes.data);
 
-        $$(".makers li a").each((i, el) => {
+        $$(".makers li a").each(async (i, el) => {
           const modelName = $$(el).find("strong span").text();
           const modelLink = "https://www.gsmarena.com/" + $$(el).attr("href");
           const img = $$(el).find("img").attr("src");
+
+          // ✅ Model details
+          let specs = {};
+          try {
+            const modelRes = await safeRequest(modelLink);
+            const $$$ = cheerio.load(modelRes.data);
+
+            $$$(".specs-brief span").each((j, specEl) => {
+              specs[`spec_${j}`] = $$$(specEl).text();
+            });
+          } catch (err) {
+            console.error(`❌ Error scraping model ${modelName}:`, err.message);
+          }
 
           allPhones.push({
             brand: brand.brand,
             model: modelName,
             link: modelLink,
-            image: img
+            image: img,
+            specs: specs
           });
         });
+
+        console.log(`✅ Scraped ${brand.brand}, total phones: ${allPhones.length}`);
+        await sleep(3000); // delay between brands
+
       } catch (err) {
         console.error(`❌ Error scraping brand ${brand.brand}:`, err.message);
       }
     }
 
-    // ✅ Firebase এ সেভ করো
     await set(ref(db, "phones/latest"), allPhones);
     console.log("✅ All phone data saved to Firebase. Total:", allPhones.length);
 
-    // ✅ কাজ শেষ হলে exit করো
     process.exit(0);
 
   } catch (err) {
