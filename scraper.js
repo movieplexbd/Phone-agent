@@ -3,7 +3,6 @@ import * as cheerio from "cheerio";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set } from "firebase/database";
 
-// ✅ Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyBsz-82MDaibWnIBUpoykrZHyJW7UMedX8",
   authDomain: "movies-bee24.firebaseapp.com",
@@ -18,24 +17,54 @@ const db = getDatabase(app);
 
 async function scrapePhones() {
   try {
-    // Step 1: ওয়েব থেকে ডাটা আনা
     const url = "https://www.gsmarena.com/";
     const res = await axios.get(url);
     const $ = cheerio.load(res.data);
 
-    let phoneBrands = [];
+    let phoneData = [];
+
+    // ✅ প্রতিটি ব্র্যান্ডের লিঙ্ক বের করো
     $(".brandmenu-v2 li a").each((i, el) => {
-      phoneBrands.push($(el).text());
+      const brandName = $(el).text();
+      const brandLink = "https://www.gsmarena.com/" + $(el).attr("href");
+      phoneData.push({ brand: brandName, link: brandLink });
     });
 
-    // Step 2: সরাসরি Firebase এ সেভ করা
-    await set(ref(db, "phones/latest"), phoneBrands);
-    console.log("✅ Phone brands saved to Firebase:", phoneBrands);
+    // ✅ প্রতিটি ব্র্যান্ডের পেজ থেকে লেটেস্ট ফোন মডেল scrape করো
+    let allPhones = [];
+    for (let brand of phoneData) {
+      try {
+        const brandRes = await axios.get(brand.link);
+        const $$ = cheerio.load(brandRes.data);
+
+        $$(".makers li a").each((i, el) => {
+          const modelName = $$(el).find("strong span").text();
+          const modelLink = "https://www.gsmarena.com/" + $$(el).attr("href");
+          const img = $$(el).find("img").attr("src");
+
+          allPhones.push({
+            brand: brand.brand,
+            model: modelName,
+            link: modelLink,
+            image: img
+          });
+        });
+      } catch (err) {
+        console.error(`❌ Error scraping brand ${brand.brand}:`, err.message);
+      }
+    }
+
+    // ✅ Firebase এ সেভ করো
+    await set(ref(db, "phones/latest"), allPhones);
+    console.log("✅ All phone data saved to Firebase. Total:", allPhones.length);
+
+    // ✅ কাজ শেষ হলে exit করো
+    process.exit(0);
 
   } catch (err) {
-    console.error("❌ Error during scraping:", err.message);
+    console.error("❌ Fatal Error:", err.message);
+    process.exit(1);
   }
 }
 
-// Run
 scrapePhones();
