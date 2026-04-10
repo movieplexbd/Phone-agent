@@ -3,7 +3,7 @@ name: Phone Scraper
 on:
   schedule:
     - cron: "*/10 * * * *"   # প্রতি ১০ মিনিটে রান হবে
-  workflow_dispatch:
+  workflow_dispatch:          # চাইলে ম্যানুয়ালি চালানো যাবে
 
 jobs:
   scrape:
@@ -15,12 +15,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20"   # ✅ Node.js 20 ব্যবহার করো
+          node-version: "20"
 
       - name: Install dependencies
         run: npm install
 
       - name: Run scraper
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: node scraper.js
