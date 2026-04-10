@@ -1,6 +1,5 @@
 import axios from "axios";
-import * as cheerio from "cheerio";   // ✅ fixed import
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as cheerio from "cheerio";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set } from "firebase/database";
 
@@ -17,10 +16,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ Gemini Setup
-console.log("🔑 Gemini Key Loaded:", process.env.GEMINI_API_KEY ? "Yes" : "No");
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 async function scrapePhones() {
   try {
     // Step 1: ওয়েব থেকে ডাটা আনা
@@ -28,28 +23,14 @@ async function scrapePhones() {
     const res = await axios.get(url);
     const $ = cheerio.load(res.data);
 
-    let rawData = [];
+    let phoneBrands = [];
     $(".brandmenu-v2 li a").each((i, el) => {
-      rawData.push($(el).text());
+      phoneBrands.push($(el).text());
     });
 
-    // Step 2: Gemini দিয়ে JSON এ সাজানো
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `
-Take this phone list: ${rawData.join(", ")}.
-Return JSON in this exact format:
-[
-  { "brand": "BrandName", "model": "ModelName" },
-  { "brand": "BrandName", "model": "ModelName" }
-]
-No extra text, only valid JSON.
-`;
-    const result = await model.generateContent(prompt);
-    const structuredData = JSON.parse(result.response.text());
-
-    // Step 3: Firebase এ সেভ করা
-    await set(ref(db, "phones/latest"), structuredData);
-    console.log("✅ Data saved to Firebase:", structuredData);
+    // Step 2: সরাসরি Firebase এ সেভ করা
+    await set(ref(db, "phones/latest"), phoneBrands);
+    console.log("✅ Phone brands saved to Firebase:", phoneBrands);
 
   } catch (err) {
     console.error("❌ Error during scraping:", err.message);
