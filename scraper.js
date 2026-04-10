@@ -1,10 +1,10 @@
 import axios from "axios";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";   // ✅ fixed import
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set } from "firebase/database";
 
-// Firebase Config (তুমি যেটা দিয়েছো)
+// ✅ Firebase Config (তুমি যেটা দিয়েছো)
 const firebaseConfig = {
   apiKey: "AIzaSyBsz-82MDaibWnIBUpoykrZHyJW7UMedX8",
   authDomain: "movies-bee24.firebaseapp.com",
@@ -17,22 +17,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Gemini Setup
+// ✅ Gemini Setup (Secret থেকে আসবে)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function scrapePhones() {
-  const url = "https://www.gsmarena.com/";
-  const res = await axios.get(url);
-  const $ = cheerio.load(res.data);
+  try {
+    // Step 1: ওয়েব থেকে ডাটা আনা
+    const url = "https://www.gsmarena.com/";
+    const res = await axios.get(url);
+    const $ = cheerio.load(res.data);
 
-  let rawData = [];
-  $(".brandmenu-v2 li a").each((i, el) => {
-    rawData.push($(el).text());
-  });
+    let rawData = [];
+    $(".brandmenu-v2 li a").each((i, el) => {
+      rawData.push($(el).text());
+    });
 
-  // Gemini দিয়ে ডাটা JSON এ রূপান্তর (strict format)
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-  const prompt = `
+    // Step 2: Gemini দিয়ে JSON এ সাজানো (strict format)
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const prompt = `
 Take this phone list: ${rawData.join(", ")}.
 Return JSON in this exact format:
 [
@@ -41,12 +43,17 @@ Return JSON in this exact format:
 ]
 No extra text, only valid JSON.
 `;
-  const result = await model.generateContent(prompt);
-  const structuredData = JSON.parse(result.response.text());
+    const result = await model.generateContent(prompt);
+    const structuredData = JSON.parse(result.response.text());
 
-  // Firebase এ সেভ
-  await set(ref(db, "phones/latest"), structuredData);
-  console.log("Data saved:", structuredData);
+    // Step 3: Firebase এ সেভ করা
+    await set(ref(db, "phones/latest"), structuredData);
+    console.log("✅ Data saved to Firebase:", structuredData);
+
+  } catch (err) {
+    console.error("❌ Error during scraping:", err.message);
+  }
 }
 
+// Run
 scrapePhones();
