@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set } from "firebase/database";
 
-// ✅ Firebase Config (তুমি যেটা দিয়েছো)
+// ✅ Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyBsz-82MDaibWnIBUpoykrZHyJW7UMedX8",
   authDomain: "movies-bee24.firebaseapp.com",
@@ -17,7 +17,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ Gemini Setup (Secret থেকে আসবে)
+// ✅ Gemini Setup
+console.log("🔑 Gemini Key Loaded:", process.env.GEMINI_API_KEY ? "Yes" : "No");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function scrapePhones() {
@@ -32,7 +33,7 @@ async function scrapePhones() {
       rawData.push($(el).text());
     });
 
-    // Step 2: Gemini দিয়ে JSON এ সাজানো (strict format)
+    // Step 2: Gemini দিয়ে JSON এ সাজানো
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const prompt = `
 Take this phone list: ${rawData.join(", ")}.
