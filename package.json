@@ -1,0 +1,12 @@
+{
+  "name": "phone-agent",
+  "version": "1.0.0",
+  "main": "scraper.js",
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "cheerio": "^1.0.0",
+    "firebase": "^9.6.1",
+    "@google/generative-ai": "^0.3.0"
+  }
+}
